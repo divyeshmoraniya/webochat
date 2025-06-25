@@ -42,7 +42,7 @@ app.listen(port,()=>{
     console.log("webochat is running!!")
 })
 
-app.use("/", ()=>{
+app.use("/", (req,res)=>{
     return res.json("webocaht backend running!!!")
 })
 
