@@ -42,6 +42,10 @@ app.listen(port,()=>{
     console.log("webochat is running!!")
 })
 
+app.use("/", ()=>{
+    return res.json("webocaht backend running!!!")
+})
+
 connectToDatabase().then(() => {
     app.listen(port, () => {
         console.log(`Server is running on port ${port}`);
