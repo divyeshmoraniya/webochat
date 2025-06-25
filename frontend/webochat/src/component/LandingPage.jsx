@@ -23,7 +23,7 @@ const LandingPage = () => {
 
         const sendUserData = async () => {
             try {
-                const response = await fetch("http://localhost:4000/api/user/me", {
+                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/user/me`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

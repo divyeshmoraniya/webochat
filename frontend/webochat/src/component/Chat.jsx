@@ -29,7 +29,7 @@ function Chat() {
         if (!email || !userEmail) return;
 
         try {
-            const response = await axios.post("http://localhost:4000/api/chat/addchat", {
+            const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/chat/addchat`, {
                 senderemail: userEmail,
                 receiverEmail: email
             });
@@ -78,7 +78,7 @@ function Chat() {
             });
 
             if (result.isConfirmed) {
-                const response = await axios.post("http://localhost:4000/api/chat/deletechat", {
+                const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/chat/deletechat`, {
                     userEmail: userEmail,
                     chatWithEmail: chatWithEmail
                 });
@@ -182,7 +182,7 @@ function Chat() {
             setLoading(true);
             setError(null);
 
-            const response = await fetch(`http://localhost:4000/api/chat/getchat/${encodeURIComponent(userEmail)}`);
+            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/chat/getchat/${encodeURIComponent(userEmail)}`);
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -275,7 +275,7 @@ function Chat() {
 
             try {
                 // API call to send message
-                const response = await axios.post('http://localhost:4000/api/chat/send-message', {
+                const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/chat/send-message`, {
                     senderEmail: userEmail,
                     receiverEmail: selectedChat.email,
                     message: messageText.trim()
