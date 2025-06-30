@@ -17,12 +17,12 @@ function Chat() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const messagesEndRef = useRef(null);
-
+    
     const { user } = useUser();
     // Get user email
     const userEmail = user?.primaryEmailAddress?.emailAddress;
-
-    console.log(userEmail);
+    
+    
 
     // Function to add chat - moved outside useEffect and made useCallback
     const addChat = useCallback(async (email) => {
@@ -33,7 +33,6 @@ function Chat() {
                 senderemail: userEmail,
                 receiverEmail: email
             });
-
             if (response.status === 200) {
                 Swal.fire({
                     title: "Chat Added",
@@ -78,10 +77,13 @@ function Chat() {
             });
 
             if (result.isConfirmed) {
-                const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/chat/deletechat`, {
-                    userEmail: userEmail,
-                    chatWithEmail: chatWithEmail
-                });
+                const response = await axios.delete(`${import.meta.env.VITE_BACKEND_URL}/api/chat/deletechat`, {
+                    data: { // Use 'data' property for DELETE requests
+                        userEmail: userEmail,
+                        chatWithEmail: chatWithEmail
+                    }
+                }
+            );
 
                 if (response.status === 200) {
                     Swal.fire({
@@ -611,11 +613,11 @@ function Chat() {
                         {/* Message Input */}
                         <div className={`p-4 transition-colors duration-300 ${darkMode ? 'bg-gray-700' : 'bg-white'} border-t ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
                             <div className="flex items-end space-x-2">
-                                <button className={`p-2 rounded-full transition-colors duration-200 ${darkMode ? 'hover:bg-gray-600 text-gray-300' : 'hover:bg-gray-200 text-gray-600'}`}>
+                                <button className={`p-2 mb-2 rounded-full transition-colors duration-200 ${darkMode ? 'hover:bg-gray-600 text-gray-300' : 'hover:bg-gray-200 text-gray-600'}`}>
                                     <Smile size={20} />
                                 </button>
-                                <button className={`p-2 rounded-full transition-colors duration-200 ${darkMode ? 'hover:bg-gray-600 text-gray-300' : 'hover:bg-gray-200 text-gray-600'}`}>
-                                    <Paperclip size={20} />
+                                <button className={`p-2 mb-2 rounded-full transition-colors duration-200 ${darkMode ? 'hover:bg-gray-600 text-gray-300' : 'hover:bg-gray-200 text-gray-600'}`}>
+                                    <Paperclip  size={20} />
                                 </button>
                                 <div className="flex-1">
                                     <textarea
@@ -634,7 +636,7 @@ function Chat() {
                                 <button
                                     onClick={handleSendMessage}
                                     disabled={!messageText.trim()}
-                                    className="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200"
+                                    className="p-2 mb-2  bg-green-500 text-white rounded-full hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200"
                                 >
                                     <Send size={20} />
                                 </button>

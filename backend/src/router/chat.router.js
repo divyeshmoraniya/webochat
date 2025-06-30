@@ -5,5 +5,5 @@ export const chatRouter = Router();
 chatRouter.route("/addchat").post(addMember);
 chatRouter.route("/getchat/:email").get(getchatbyemail);
 chatRouter.route("/deletechat").delete(hideChatForUser);
-chatRouter.route("/gethiddenchat").get(gethiddenchat);
+chatRouter.route("/gethiddenchat/:clerkId").get(gethiddenchat);
 chatRouter.route("/unhide").post(unhidechat)
