@@ -1,5 +1,5 @@
 /*!
-* sweetalert2 v11.22.0
+* sweetalert2 v11.22.2
 * Released under the MIT License.
 */
 (function (global, factory) {
@@ -1517,11 +1517,18 @@
       successIconParts[i].style.backgroundColor = popupBackgroundColor;
     }
   };
-  const successIconHtml = `
-  <div class="swal2-success-circular-line-left"></div>
+
+  /**
+   *
+   * @param {SweetAlertOptions} params
+   * @returns {string}
+   */
+  const successIconHtml = params => `
+  ${params.animation ? '<div class="swal2-success-circular-line-left"></div>' : ''}
   <span class="swal2-success-line-tip"></span> <span class="swal2-success-line-long"></span>
-  <div class="swal2-success-ring"></div> <div class="swal2-success-fix"></div>
-  <div class="swal2-success-circular-line-right"></div>
+  <div class="swal2-success-ring"></div>
+  ${params.animation ? '<div class="swal2-success-fix"></div>' : ''}
+  ${params.animation ? '<div class="swal2-success-circular-line-right"></div>' : ''}
 `;
   const errorIconHtml = `
   <span class="swal2-x-mark">
@@ -1543,7 +1550,7 @@
     if (params.iconHtml) {
       newContent = iconContent(params.iconHtml);
     } else if (params.icon === 'success') {
-      newContent = successIconHtml;
+      newContent = successIconHtml(params);
       oldContent = oldContent.replace(/ style=".*?"/g, ''); // undo adjustSuccessIconBackgroundColor()
     } else if (params.icon === 'error') {
       newContent = errorIconHtml;
@@ -2110,8 +2117,8 @@
    * @param {Function} dismissWith
    */
   const handleEsc = (event, innerParams, dismissWith) => {
+    event.preventDefault();
     if (callIfFunction(innerParams.allowEscapeKey)) {
-      event.preventDefault();
       dismissWith(DismissReason.esc);
     }
   };
@@ -4621,7 +4628,7 @@
     };
   });
   SweetAlert.DismissReason = DismissReason;
-  SweetAlert.version = '11.22.0';
+  SweetAlert.version = '11.22.2';
 
   const Swal = SweetAlert;
   // @ts-ignore
