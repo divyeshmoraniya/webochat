@@ -4,6 +4,10 @@ import { useUser } from '@clerk/clerk-react';
 import Swal from "sweetalert2";
 import axios from "axios";
 import { Link } from 'react-router-dom';
+import { io } from "socket.io-client";
+
+// Initialize socket connection
+const socket = io(`${import.meta.env.VITE_BACKEND_URL}`);
 
 function Chat() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -17,12 +21,73 @@ function Chat() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const messagesEndRef = useRef(null);
-    
+
     const { user } = useUser();
     // Get user email
     const userEmail = user?.primaryEmailAddress?.emailAddress;
-    
-    
+
+    // Socket connection and message handling
+    useEffect(() => {
+        if (!socket.connected) {
+            socket.connect();
+        }
+
+        // Listen for incoming messages
+        socket.on("send-message", (newMessage) => {
+            console.log("Received message:", newMessage);
+
+            // Update contacts state with new message
+            setContacts(prevContacts => {
+                return prevContacts.map(contact => {
+                    // Check if this message belongs to this contact
+                    const isMessageForThisContact =
+                        (newMessage.sender.Email === contact.email && newMessage.receiver.Email === userEmail) ||
+                        (newMessage.receiver.Email === contact.email && newMessage.sender.Email === userEmail);
+
+                    if (isMessageForThisContact) {
+                        const formattedMessage = {
+                            id: newMessage._id,
+                            text: newMessage.message[0], // Assuming message is an array
+                            time: new Date(newMessage.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            sent: newMessage.sender.Email === userEmail,
+                            timestamp: newMessage.timestamp || new Date().toISOString()
+                        };
+
+                        const updatedContact = {
+                            ...contact,
+                            messages: [...contact.messages, formattedMessage],
+                            lastMessage: formattedMessage.text,
+                            time: formattedMessage.time
+                        };
+
+                        // If this is the selected chat, update it too
+                        if (selectedChat && selectedChat.id === contact.id) {
+                            setSelectedChat(updatedContact);
+                        }
+
+                        return updatedContact;
+                    }
+                    return contact;
+                });
+            });
+        });
+
+        // Handle connection events
+        socket.on("connect", () => {
+            console.log("Connected to server:", socket.id);
+        });
+
+        socket.on("disconnect", () => {
+            console.log("Disconnected from server");
+        });
+
+        // Cleanup on unmount
+        return () => {
+            socket.off("send-message");
+            socket.off("connect");
+            socket.off("disconnect");
+        };
+    }, [userEmail, selectedChat]);
 
     // Function to add chat - moved outside useEffect and made useCallback
     const addChat = useCallback(async (email) => {
@@ -83,7 +148,7 @@ function Chat() {
                         chatWithEmail: chatWithEmail
                     }
                 }
-            );
+                );
 
                 if (response.status === 200) {
                     Swal.fire({
@@ -276,7 +341,18 @@ function Chat() {
             };
 
             try {
-                // API call to send message
+                // Find user IDs for socket emission
+                const senderUser = user; // Current user from Clerk
+                const receiverEmail = selectedChat.email;
+
+                // Emit message via socket for real-time delivery
+                socket.emit("get-message", {
+                    senderId: senderUser?.id || userEmail, // Use Clerk user ID or email as fallback
+                    receiverId: selectedChat.id, // Receiver's user ID
+                    content: messageText.trim()
+                });
+
+                // Also make API call for persistence (optional, since socket already saves to DB)
                 const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/chat/send-message`, {
                     senderEmail: userEmail,
                     receiverEmail: selectedChat.email,
@@ -614,31 +690,38 @@ function Chat() {
                         <div className={`p-4 transition-colors duration-300 ${darkMode ? 'bg-gray-700' : 'bg-white'} border-t ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
                             <div className="flex items-end space-x-2">
                                 <button className={`p-2 mb-2 rounded-full transition-colors duration-200 ${darkMode ? 'hover:bg-gray-600 text-gray-300' : 'hover:bg-gray-200 text-gray-600'}`}>
-                                    <Smile size={20} />
+                                    <Paperclip size={20} />
                                 </button>
-                                <button className={`p-2 mb-2 rounded-full transition-colors duration-200 ${darkMode ? 'hover:bg-gray-600 text-gray-300' : 'hover:bg-gray-200 text-gray-600'}`}>
-                                    <Paperclip  size={20} />
-                                </button>
-                                <div className="flex-1">
+
+                                <div className="flex-1 relative">
                                     <textarea
                                         value={messageText}
                                         onChange={(e) => setMessageText(e.target.value)}
                                         onKeyPress={handleKeyPress}
                                         placeholder="Type a message..."
-                                        rows="1"
-                                        className={`w-full px-4 py-2 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200 ${darkMode
-                                            ? 'bg-gray-600 text-white placeholder-gray-400 border-gray-600'
-                                            : 'bg-gray-100 text-gray-900 placeholder-gray-500 border-gray-300'
+                                        rows={1}
+                                        className={`w-full p-3 pr-12 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200 ${darkMode
+                                                ? 'bg-gray-600 text-white placeholder-gray-400 border-gray-600'
+                                                : 'bg-gray-100 text-gray-900 placeholder-gray-500 border-gray-300'
                                             }`}
-                                        style={{ minHeight: '40px', maxHeight: '100px' }}
+                                        style={{ minHeight: '44px', maxHeight: '120px' }}
                                     />
+                                    <button className={`absolute right-3 bottom-3 transition-colors duration-200 ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-600'}`}>
+                                        <Smile size={18} />
+                                    </button>
                                 </div>
+
                                 <button
                                     onClick={handleSendMessage}
                                     disabled={!messageText.trim()}
-                                    className="p-2 mb-2  bg-green-500 text-white rounded-full hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200"
+                                    className={`p-3 rounded-full transition-all duration-200 ${messageText.trim()
+                                            ? 'bg-green-500 hover:bg-green-600 text-white'
+                                            : darkMode
+                                                ? 'bg-gray-600 text-gray-500'
+                                                : 'bg-gray-200 text-gray-400'
+                                        }`}
                                 >
-                                    <Send size={20} />
+                                    <Send size={18} />
                                 </button>
                             </div>
                         </div>
@@ -646,26 +729,22 @@ function Chat() {
                 ) : (
                     /* Welcome Screen */
                     <div className={`flex-1 flex items-center justify-center transition-colors duration-300 ${darkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
-                        <div className="text-center max-w-md mx-auto p-8">
-                            <MessageCircle size={80} className={`mx-auto mb-6 ${darkMode ? 'text-gray-600' : 'text-gray-300'}`} />
-                            <h2 className={`text-2xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        <div className="text-center">
+                            <MessageCircle size={64} className={`mx-auto mb-4 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                            <h2 className={`text-2xl font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                                 Welcome to WhatsChat
                             </h2>
-                            <p className={`text-lg mb-6 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                Select a chat to start messaging</p>
-                            <p className={`${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                                Send and receive messages instantly
+                            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                Select a chat to start messaging
                             </p>
                         </div>
                     </div>
                 )}
-            </div>
 
-            {/* Profile Sidebar */}
-            {showProfile && selectedChat && (
-                <div className={`w-80 transition-colors duration-300 ${darkMode ? 'bg-gray-800' : 'bg-white'} border-l ${darkMode ? 'border-gray-700' : 'border-gray-200'} overflow-y-auto`}>
-                    <div className={`p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                        <div className="flex items-center justify-between mb-4">
+                {/* Profile Sidebar */}
+                {showProfile && selectedChat && (
+                    <div className={`w-80 transition-colors duration-300 ${darkMode ? 'bg-gray-700' : 'bg-white'} border-l ${darkMode ? 'border-gray-600' : 'border-gray-200'} p-4`}>
+                        <div className="flex items-center justify-between mb-6">
                             <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                                 Contact Info
                             </h3>
@@ -673,7 +752,7 @@ function Chat() {
                                 onClick={() => setShowProfile(false)}
                                 className={`p-2 rounded-full transition-colors duration-200 ${darkMode ? 'hover:bg-gray-600 text-gray-300' : 'hover:bg-gray-200 text-gray-600'}`}
                             >
-                                <X size={20} />
+                                <X size={18} />
                             </button>
                         </div>
 
@@ -689,142 +768,106 @@ function Chat() {
                             <h4 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                                 {selectedChat.name}
                             </h4>
-                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                                 {selectedChat.email}
                             </p>
-                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mt-1`}>
+                            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                                 {selectedChat.online ? 'Online' : 'Last seen recently'}
                             </p>
                         </div>
 
                         <div className="space-y-4">
-                            <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                            <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-600' : 'bg-gray-100'}`}>
                                 <div className="flex items-center justify-between">
-                                    <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                                        Messages
+                                    <span className={`${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                        Media, links and docs
                                     </span>
-                                    <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                    <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                                         {selectedChat.messages.length}
                                     </span>
                                 </div>
                             </div>
 
-                            <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                            <div className={`p-3 rounded-lg ${darkMode ? 'bg-gray-600' : 'bg-gray-100'}`}>
                                 <div className="flex items-center justify-between">
-                                    <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                                        Status
+                                    <span className={`${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                        Starred messages
                                     </span>
-                                    <span className={`text-sm font-medium ${selectedChat.online ? 'text-green-500' : darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                        {selectedChat.online ? 'Online' : 'Offline'}
+                                    <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                        0
                                     </span>
                                 </div>
                             </div>
 
-                            {selectedChat.vip && (
-                                <div className={`p-3 rounded-lg ${darkMode ? 'bg-yellow-900/20' : 'bg-yellow-50'} border ${darkMode ? 'border-yellow-800' : 'border-yellow-200'}`}>
-                                    <div className="flex items-center">
-                                        <Star size={16} className="text-yellow-500 mr-2" fill="currentColor" />
-                                        <span className={`text-sm font-medium ${darkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
-                                            VIP Contact
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="mt-6 space-y-2">
-                            <button className={`w-full p-3 rounded-lg text-left transition-colors duration-200 ${darkMode ? 'hover:bg-gray-600 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>
-                                <div className="flex items-center">
-                                    <Video size={18} className="mr-3" />
-                                    <span>Video Call</span>
-                                </div>
-                            </button>
-
-                            <button className={`w-full p-3 rounded-lg text-left transition-colors duration-200 ${darkMode ? 'hover:bg-gray-600 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>
-                                <div className="flex items-center">
-                                    <Phone size={18} className="mr-3" />
-                                    <span>Voice Call</span>
-                                </div>
-                            </button>
-
                             <button
                                 onClick={() => hideChat(selectedChat.email)}
-                                className={`w-full p-3 rounded-lg text-left transition-colors duration-200 ${darkMode ? 'hover:bg-red-600 text-red-400' : 'hover:bg-red-50 text-red-600'}`}
+                                className={`w-full p-3 rounded-lg transition-colors duration-200 ${darkMode
+                                        ? 'bg-red-600 hover:bg-red-700 text-white'
+                                        : 'bg-red-500 hover:bg-red-600 text-white'
+                                    }`}
                             >
-                                <div className="flex items-center">
-                                    <EyeOff size={18} className="mr-3" />
-                                    <span>Hide Chat</span>
-                                </div>
+                                Hide Chat
                             </button>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
 
             {/* Add Chat Modal */}
             {showAddChat && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className={`w-full max-w-md rounded-lg shadow-xl transition-colors duration-300 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                        <div className={`p-6 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                            <div className="flex items-center justify-between">
-                                <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                                    Add New Chat
-                                </h3>
-                                <button
-                                    onClick={() => {
-                                        setShowAddChat(false);
-                                        setNewEmail('');
-                                    }}
-                                    className={`p-2 rounded-full transition-colors duration-200 ${darkMode ? 'hover:bg-gray-600 text-gray-300' : 'hover:bg-gray-200 text-gray-600'}`}
-                                >
-                                    <X size={20} />
-                                </button>
-                            </div>
+                    <div className={`w-full max-w-md p-6 rounded-lg transition-colors duration-300 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                Add New Chat
+                            </h3>
+                            <button
+                                onClick={() => setShowAddChat(false)}
+                                className={`p-2 rounded-full transition-colors duration-200 ${darkMode ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-200 text-gray-600'}`}
+                            >
+                                <X size={18} />
+                            </button>
                         </div>
 
-                        <div className="p-6">
-                            <div className="mb-4">
-                                <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                                    Email Address
-                                </label>
-                                <input
-                                    type="email"
-                                    value={newEmail}
-                                    onChange={(e) => setNewEmail(e.target.value)}
-                                    placeholder="Enter email address"
-                                    className={`w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200 ${darkMode
+                        <div className="mb-4">
+                            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                Email Address
+                            </label>
+                            <input
+                                type="email"
+                                value={newEmail}
+                                onChange={(e) => setNewEmail(e.target.value)}
+                                placeholder="Enter email address"
+                                className={`w-full p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200 ${darkMode
                                         ? 'bg-gray-700 text-white placeholder-gray-400 border-gray-600'
-                                        : 'bg-white text-gray-900 placeholder-gray-500 border-gray-300'
-                                        }`}
-                                    onKeyPress={(e) => {
-                                        if (e.key === 'Enter') {
-                                            handleAddChat();
-                                        }
-                                    }}
-                                />
-                            </div>
+                                        : 'bg-gray-100 text-gray-900 placeholder-gray-500 border-gray-300'
+                                    }`}
+                                onKeyPress={(e) => e.key === 'Enter' && handleAddChat()}
+                            />
+                        </div>
 
-                            <div className="flex space-x-3">
-                                <button
-                                    onClick={() => {
-                                        setShowAddChat(false);
-                                        setNewEmail('');
-                                    }}
-                                    className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${darkMode
-                                        ? 'bg-gray-600 text-white hover:bg-gray-500'
-                                        : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                                        }`}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleAddChat}
-                                    disabled={!newEmail.trim()}
-                                    className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200"
-                                >
-                                    Add Chat
-                                </button>
-                            </div>
+                        <div className="flex space-x-3">
+                            <button
+                                onClick={() => setShowAddChat(false)}
+                                className={`flex-1 p-3 rounded-lg transition-colors duration-200 ${darkMode
+                                        ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                                        : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                                    }`}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleAddChat}
+                                disabled={!newEmail.trim()}
+                                className={`flex-1 p-3 rounded-lg transition-colors duration-200 ${newEmail.trim()
+                                        ? 'bg-green-500 hover:bg-green-600 text-white'
+                                        : darkMode
+                                            ? 'bg-gray-600 text-gray-500'
+                                            : 'bg-gray-300 text-gray-500'
+                                    }`}
+                            >
+                                Add Chat
+                            </button>
                         </div>
                     </div>
                 </div>
