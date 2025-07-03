@@ -7,11 +7,11 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: process.env.PORT || 5173,
-    allowedHosts: ['webochat-pmeg.onrender.com'], 
+    allowedHosts: ['https://webochat-2e2q.onrender.com/'], 
   },
   preview: {
     host: '0.0.0.0',
     port: process.env.PORT || 5173,
-    allowedHosts: ['webochat-pmeg.onrender.com'], 
+    allowedHosts: ['https://webochat-2e2q.onrender.com/'], 
   },
 });
