@@ -8,6 +8,7 @@ import {
 import { useState, useEffect } from 'react';
 import { MessageCircle, Users, Shield, Zap, Menu, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import GoogleTranslate from './GoogleTranslate';
 const LandingPage = () => {
     const { isLoaded, isSignedIn, user } = useUser();
     const [isScrolled, setIsScrolled] = useState(false);
@@ -59,6 +60,7 @@ const LandingPage = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50">
+            
             {/* Header */}
             <header className={`fixed top-0 w-full z-50 transition-all duration-300 ${isScrolled ? 'bg-white/90 backdrop-blur-md shadow-lg' : 'bg-transparent'
                 }`}>
@@ -349,6 +351,7 @@ const LandingPage = () => {
                         </div>
                     </div>
                     <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+                        <GoogleTranslate />
                         <p>&copy; 2025 ChatApp. All rights reserved.</p>
                     </div>
                 </div>
