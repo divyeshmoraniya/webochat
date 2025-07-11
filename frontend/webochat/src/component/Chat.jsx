@@ -93,9 +93,9 @@ function Chat() {
 
         // Cleanup on unmount
         return () => {
+            socket.disconnect()
             socket.off("send-message");
             socket.off("connect");
-            socket.off("disconnect");
         };
     }, []);
 
