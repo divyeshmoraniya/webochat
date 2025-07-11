@@ -15,3 +15,15 @@ export default defineConfig({
     allowedHosts: ['webochat-2e2q.onrender.com'], 
   },
 });
+
+
+// import { defineConfig } from 'vite'
+// import react from '@vitejs/plugin-react'
+// import tailwindcss from '@tailwindcss/vite'
+
+// export default defineConfig({
+
+  
+//   plugins: [react(), tailwindcss()],
+
+// });

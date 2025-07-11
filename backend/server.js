@@ -63,47 +63,59 @@ app.use("/", (req,res)=>{
 
 // io connection for send messege
 
-io.on("connection",(socket) => {
-    console.log(`user connected ${socket.id}`);
+io.on("connection", (socket) => {
+  console.log(`user connected ${socket.id}`);
 
-   
-    //get msg from client
-    socket.on("get-message", async ({ senderId, receiverId, content }) => {
-        try {
-            const senderUser = await User.findOne({ clerkId: senderId }).select("_id");
-            if (!senderUser) return;
+  // Let the client tell which room (chat) they want to join
+  socket.on("join-chat", (roomId) => {
+    socket.join(roomId);
+    console.log(`Socket ${socket.id} joined room ${roomId}`);
+  });
 
-            const senderObjectId = senderUser._id;
+  socket.on("get-message", async ({ senderId, receiverId, content }) => {
+    try {
+      const senderUser = await User.findOne({ clerkId: senderId }).select("_id");
+      if (!senderUser) return;
 
-            // Try to find an existing chat between these two users
-            let existingChat = await Message.findOne({
-                $or: [
-                    { sender: senderObjectId, receiver: receiverId },
-                    { sender: receiverId, receiver: senderObjectId }
-                ]
-            });
+      const senderObjectId = senderUser._id;
 
-            if (existingChat) {
-                // Append new message to the message array
-                existingChat.message.push(content);
-                await existingChat.save();
-                io.emit("send-message", existingChat);
-            } else {
-                // No chat found — create new one
-                const newMessage = new Message({
-                    sender: senderObjectId,
-                    receiver: receiverId,
-                    message: [content],
-                    hiddenFrom: []
-                });
-                await newMessage.save();
-                io.emit("send-message", newMessage);
-            }
-        } catch (err) {
-            console.error("Socket message error:", err);
-        }
-    });
-})
+      // Create a unique room id for the two users (sorted to be consistent)
+      const roomId =
+        senderId < receiverId
+          ? `${senderId}_${receiverId}`
+          : `${receiverId}_${senderId}`;
+
+      let existingChat = await Message.findOne({
+        $or: [
+          { sender: senderObjectId, receiver: receiverId },
+          { sender: receiverId, receiver: senderObjectId }
+        ]
+      });
+
+      if (existingChat) {
+        existingChat.message.push(content);
+        await existingChat.save();
+
+        // Emit only to the room, not all clients
+        io.to(roomId).emit("send-message", existingChat);
+      } else {
+        const newMessage = new Message({
+          sender: senderObjectId,
+          receiver: receiverId,
+          message: [content],
+          hiddenFrom: []
+        });
+        await newMessage.save();
+
+        // Emit only to the room
+        io.to(roomId).emit("send-message", newMessage);
+      }
+    } catch (err) {
+      console.error("Socket message error:", err);
+    }
+  });
+});
+
 
 connectToDatabase().then(() => {
     httpServer.listen(port, () => {

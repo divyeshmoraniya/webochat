@@ -25,12 +25,22 @@ function Chat() {
     const { user } = useUser();
     // Get user email
     const userEmail = user?.primaryEmailAddress?.emailAddress;
-
+    function getRoomId(userEmail1, userEmail2) {
+  return userEmail1 < userEmail2
+    ? `${userEmail1}_${userEmail2}`
+    : `${userEmail2}_${userEmail1}`;
+}
     // Socket connection and message handling
     useEffect(() => {
         if (!socket.connected) {
             socket.connect();
         }
+
+    if (selectedChat && userEmail) {
+    const roomId = getRoomId(userEmail, selectedChat.email);
+    socket.emit("join-chat", roomId);
+    console.log("Joined room:", roomId);
+  }
 
         // Listen for incoming messages
         socket.on("send-message", (newMessage) => {
