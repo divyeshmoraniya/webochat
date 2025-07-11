@@ -97,7 +97,7 @@ function Chat() {
             socket.off("connect");
             socket.off("disconnect");
         };
-    }, [userEmail, selectedChat]);
+    }, []);
 
     // Function to add chat - moved outside useEffect and made useCallback
     const addChat = useCallback(async (email) => {
